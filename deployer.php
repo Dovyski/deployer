@@ -2,9 +2,20 @@
 
 define('DS', DIRECTORY_SEPARATOR);
 
+function exec_dry($cmd, &$output, &$result_code, $dry_run = false) {
+    if ($dry_run) {
+        echo "\e[33m[fake-run]\e[0m $cmd\n";
+        $output = ['fake', 'run'];
+        $result_code = 0;
+        return;
+    }
+    exec($cmd, $output, $result_code);
+}
+
 $shortopts  = '';
 $shortopts .= 'h::';
 $shortopts .= 'b::';
+$shortopts .= 'd::';
 $shortopts .= 'c::';
 $shortopts .= 'f::';
 
@@ -19,23 +30,34 @@ $longopts  = array(
     "npm-run::",
     "cautious::",
     "force::",
+    "dry-run::",
 );
 
 $options = getopt($shortopts, $longopts);
 
 if (count($options) == 0 || isset($options['h']) || isset($options['help'])) {
     echo "Usage:\n";
-    echo "  php " . basename(__FILE__) . " [options]\n";
+    echo "  php " . basename(__FILE__) . " [options]\n\n";
     echo "Options:\n";
-    echo "  --app-dir=<app-dir>\n";
-    echo "  --backup-dir=<backup-dir>\n";
-    echo "  --log-dir=<log-dir>\n";    
-    echo "  --init=<type>\n";    
-    echo "  --npm-run=<string>\n";    
-    echo "  -b, --backup-only\n";
-    echo "  -c, --cautious\n";
-    echo "  -f, --force\n";
-    echo "  -h, --help\n";
+    echo "  --app-dir=\e[33m<app-dir>\e[0m         Path to app folder that will be deployed.\n\n";
+    echo "  --backup-dir=\e[33m<backup-dir>\e[0m   Path to a folder that will be used as a storage\n";
+    echo "                              for backup files, e.g. database before migration.\n\n";
+    echo "  --log-dir=\e[33m<log-dir>\e[0m         Path to a folder that will store log files created\n";    
+    echo "                              during executions.\n\n";
+    echo "  --init=\e[33m<type>\e[0m               Initialize the app for first use, i.e. create db, run\n";
+    echo "                              migration, etc. The only available type is 'laravel'\n";
+    echo "                              for now.\n\n";
+    echo "  --npm-run=\e[33m<string>\e[0m          Value to be used in 'npm run xxx' commands. Default is 'prod',\n";    
+    echo "                              but you can use something like 'dev' to yield 'npm run dev'.\n\n";
+    echo "  -b, --backup-only           Only backup operations will be performed, but no update/fetch\n";
+    echo "                              of new code (or migrations).\n\n";
+    echo "  -c, --cautious              Make the script abort if any of the informed\n";
+    echo "                              backup/log folder does not exist.\n\n";
+    echo "  -f, --force                 Eliminate non-tracked files within the local git repo of the app\n";
+    echo "                              before performing any action (git reset --hard). Otherwise perform.\n";
+    echo "                              action and leave non-tracked files alone (git pull).\n\n";
+    echo "  -d, --dry-run               Simulates a deploy, but no real operation is performed (great for testing).\n";    
+    echo "  -h, --help                  Show this help.\n";
     exit(0);
 }
 
@@ -47,6 +69,7 @@ $npmRun = isset($options['npm-run']) ? $options['npm-run'] : 'prod';
 $backupOnly = isset($options['backup-only']) || isset($options['b']);
 $cautious = isset($options['cautious']) || isset($options['c']);
 $force = isset($options['force']) || isset($options['f']);
+$dry = isset($options['dry-run']) || isset($options['dry']) || isset($options['d']);
 
 if ($logDir == '') {
     $logDir = $appDir;
@@ -77,10 +100,15 @@ if (!file_exists($logDir)) {
     }
 }
 
+if ($init != '' && $init != 'laravel') {
+    echo "Informed \e[91m$init\e[0m is invalid for \e[33m--init\e[0m.\n";
+    exit(1);
+}
+
 $updateCmd = isset($options['update-cmd']) ? 
     $options['update-cmd'] :
     implode(' && ', [
-        'composer install -q --no-ansi --no-interaction --no-scripts --no-suggest --no-progress --prefer-dist',
+        'composer install --no-ansi --no-interaction --no-scripts --prefer-dist',
         'php artisan migrate',
         'npm install',
         "npm run $npmRun",
@@ -89,7 +117,7 @@ $updateCmd = isset($options['update-cmd']) ?
     ]);
 
 
-exec("cd '$appDir'; git fetch -u origin master 2>&1; [ $(git rev-parse HEAD) = $(git rev-parse @{u}) ] && echo 'Up to date' || echo 'Not up to date'", $output);
+exec_dry("cd '$appDir'; git fetch -u origin master 2>&1; [ $(git rev-parse HEAD) = $(git rev-parse @{u}) ] && echo 'Up to date' || echo 'Not up to date'", $output, $result_code, $dry);
 $status = implode('', $output);
 
 $now = date('Y-m-d-h-i-s');
@@ -116,11 +144,11 @@ if ($init != '') {
 
         foreach ($cmds as $cmd) {
             $initLogFilePath = "$logDir/$appName-init.log";
-            exec("cd '$appDir'; $cmd >> $initLogFilePath 2>&1", $output, $result_code);
+            exec_dry("cd '$appDir'; $cmd >> $initLogFilePath 2>&1", $output, $result_code, $dry);
 
             if ($result_code != 0) {
                 echo "\e[91mFailed to run init command:\e[0m $cmd\n";
-                echo "See log file $initLogFilePath\n.";
+                echo "See log: \e[33m$initLogFilePath\e[0m\n";
                 exit(5);
             }
         }
@@ -128,9 +156,9 @@ if ($init != '') {
         $cronFile = "/tmp/cronab-$appName";
         $cronCommend = "# Laravel scheduling for $appName ($appDir)";
 
-        exec("crontab -l > $destinationFolder/$now-crontab.txt", $output, $result_code);
+        exec_dry("crontab -l > $destinationFolder/$now-crontab.txt", $output, $result_code, $dry);
         file_put_contents($cronFile, "$cronCommend\n* * * * * cd '$appDir' && php artisan schedule:run >> /dev/null 2>&1\n");
-        exec("crontab $cronFile", $output, $result_code);
+        exec_dry("crontab $cronFile", $output, $result_code, $dry);
 
         if ($result_code != 0) {
             echo 'Problem adding crontab. Please check.' . PHP_EOL;
@@ -141,8 +169,8 @@ if ($init != '') {
     }
 }
 
-if ($status == 'Up to date' && !$backupOnly) {
-    echo "Up to date, nothing to do.\n";
+if (stripos($status, 'Up to date') !== false && !$backupOnly) {
+    echo "\e[32mAll good!\e[0m App is up to date.\n";
     exit(0);
 }
 
@@ -152,7 +180,7 @@ if (file_exists($databaseFilePath)) {
         exit(1);
     }
 
-    echo "New copy: \e[33m$databaseBackupFilePath\e[0m.\n";
+    echo "New backup: \e[33m$databaseBackupFilePath\e[0m.\n";
 }
 
 if ($backupOnly) {
@@ -160,14 +188,14 @@ if ($backupOnly) {
 }
 
 $gitCmd = $force ? 'git reset --hard 2>&1; git pull 2>&1' : 'git merge 2>&1';
-exec("cd '$appDir'; $gitCmd", $output, $result_code);
+exec_dry("cd '$appDir'; $gitCmd", $output, $result_code, $dry);
 
 if ($result_code != 0) {
     echo "\e[91mCould not merge:\e[0m $appDir.\n";
     exit(3);
 }
 
-exec("cd '$appDir'; $updateCmd", $output, $result_code);
+exec_dry("cd '$appDir'; $updateCmd", $output, $result_code, $dry);
 
 if ($result_code != 0) {
     echo "\e[91mFailed to run update command:\e[0m $updateCmd\n";
