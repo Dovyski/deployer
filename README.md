@@ -6,7 +6,7 @@
 
 # Deployer
 
-A simple command-line tool whose aim is to facilitate the continous delivery of PHP apps, particularly Laravel apps. Imagine you want to update your app everytime a new commit is pusehd to its repo, but you have no way of ssh'ing to the server or using something like Github Actions. `deployer` is a cli that can run periodically on the server to check if new code is avaiable, pulling it and executing all the migrations necessary.
+Simple command-line tool that aims to facilitate the continous delivery of PHP apps, particularly [Laravel](https://laravel.com) apps. Imagine you want to update your app (in a remote server) when a new commit is pusehd to its repo, but you have no way of ssh'ing into the server or using something like Github Actions. `deployer` is a cli that can run periodically on the server to check if new code is avaiable, pulling it and executing all the migrations accordingly.
 
 > **NOTICE:** `deployer` is a homebrewed solution to solve a very specific problem, there are better ways of doing continous delivery.
 
@@ -70,13 +70,13 @@ If you want to periodically update the app, making backups before running any mi
 crontab -e
 ```
 
-then add:
+Add the following:
 
 ```
 * * * * * dpr --app-dir="/home/user/apps/myapp" --backup-dir="/path/to/backups/folder" --log-dir="/path/to/logs/folder"
 ```
 
-In that case, `deployer` will only run migrations, create backups, etc. if the local version of the app id behind the remote repository. If it is even, nothing will happen locally.
+In that case, `deployer` will only run migrations, create backups, etc. if the local version of the app is behind the remote repository. If it is even, nothing will happen locally.
 
 ### 3. Advanced usage (optional)
 
