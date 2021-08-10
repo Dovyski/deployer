@@ -18,6 +18,7 @@ $shortopts .= 'b::';
 $shortopts .= 'd::';
 $shortopts .= 'c::';
 $shortopts .= 'f::';
+$shortopts .= 'v::';
 
 $longopts  = array(
     "app-dir:",       
@@ -31,6 +32,7 @@ $longopts  = array(
     "cautious::",
     "force::",
     "dry-run::",
+    "version::",
 );
 
 $options = getopt($shortopts, $longopts);
@@ -57,7 +59,15 @@ if (count($options) == 0 || isset($options['h']) || isset($options['help'])) {
     echo "                              before performing any action (git reset --hard). Otherwise perform.\n";
     echo "                              action and leave non-tracked files alone (git pull).\n\n";
     echo "  -d, --dry-run               Simulates a deploy, but no real operation is performed (great for testing).\n";    
+    echo "  -v, --version               Display application version.\n";
     echo "  -h, --help                  Show this help.\n";
+    exit(0);
+}
+
+if (isset($options['v']) || isset($options['version'])) {
+    echo "\e[32mdeployer\e[0m \e[33mv1.0.0\e[0m - cli to deploy PHP apps\n";
+    echo "by Fernando Bevilacqua <dovyski@gmail.com>\n";
+    echo "See https://github.com/Dovyski/deployer\n";
     exit(0);
 }
 
