@@ -1,5 +1,5 @@
 <p align="center">
-    <img width="800" src=".github/logo.png" title="Project logo"><br />
+    <img width="300" src=".github/logo.png" title="Project logo"><br />
     <img src="https://img.shields.io/maintenance/yes/2021?style=for-the-badge" title="Project status">
     <img src="https://img.shields.io/github/workflow/status/Dovyski/deployer/ci.uffs.cc?label=Build&logo=github&logoColor=white&style=for-the-badge" title="Build status">
 </p>
@@ -126,3 +126,7 @@ See all changes to this project in the [CHANGELOG.md](CHANGELOG.md) file.
 Below is a list of interesting links:
 
 * [Github Actions](https://github.com/features/actions)
+
+## Notice
+
+Icons made by <a href="https://www.flaticon.com/authors/flat-icons" title="Flat Icons">Flat Icons</a> from <a href="https://www.flaticon.com/" title="Flaticon">www.flaticon.com</a>.
