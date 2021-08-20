@@ -18,6 +18,7 @@ $shortopts .= 'b::';
 $shortopts .= 'd::';
 $shortopts .= 'c::';
 $shortopts .= 'f::';
+$shortopts .= 'r::';
 $shortopts .= 'v::';
 
 $longopts  = array(
@@ -31,6 +32,7 @@ $longopts  = array(
     "npm-run::",
     "cautious::",
     "force::",
+    "reset::",
     "dry-run::",
     "version::",
 );
@@ -55,9 +57,10 @@ if (count($options) == 0 || isset($options['h']) || isset($options['help'])) {
     echo "                              of new code (or migrations).\n\n";
     echo "  -c, --cautious              Make the script abort if any of the informed\n";
     echo "                              backup/log folder does not exist.\n\n";
-    echo "  -f, --force                 Eliminate non-tracked files within the local git repo of the app\n";
-    echo "                              before performing any action (git reset --hard). Otherwise perform.\n";
-    echo "                              action and leave non-tracked files alone (git pull).\n\n";
+    echo "  -f, --force                 Force an app update, even if no new code is pulled.";    
+    echo "  -r, --reset                 Eliminate non-tracked files within the local git repo of the app\n";
+    echo "                              before performing any action, i.e. git reset --hard. The default behaviour\n";
+    echo "                              is to leave non-tracked files alone, i.e. git pull.\n\n";
     echo "  -d, --dry-run               Simulates a deploy, but no real operation is performed (great for testing).\n";    
     echo "  -v, --version               Display application version.\n";
     echo "  -h, --help                  Show this help.\n";
@@ -79,6 +82,7 @@ $npmRun = isset($options['npm-run']) ? $options['npm-run'] : 'prod';
 $backupOnly = isset($options['backup-only']) || isset($options['b']);
 $cautious = isset($options['cautious']) || isset($options['c']);
 $force = isset($options['force']) || isset($options['f']);
+$reset = isset($options['reset']) || isset($options['r']);
 $dry = isset($options['dry-run']) || isset($options['dry']) || isset($options['d']);
 
 if ($logDir == '') {
@@ -115,6 +119,7 @@ if ($init != '' && $init != 'laravel') {
     exit(1);
 }
 
+$queueCmd = "nohup php artisan queue:work >> $logDir/$appName-queue-work.log & echo $! > $logDir/$appName-queue-work.pid";
 $updateCmd = isset($options['update-cmd']) ? 
     $options['update-cmd'] :
     implode(' && ', [
@@ -123,11 +128,11 @@ $updateCmd = isset($options['update-cmd']) ?
         'npm install',
         "npm run $npmRun",
         'php artisan queue:restart',
-        "nohup php artisan queue:work >> $logDir/$appName-queue-work.log & echo $! > $logDir/$appName-queue-work.pid",
+        $queueCmd,
     ]);
 
 
-exec_dry("cd '$appDir'; git fetch -u origin master 2>&1; [ $(git rev-parse HEAD) = $(git rev-parse @{u}) ] && echo 'Up to date' || echo 'Not up to date'", $output, $result_code, $dry);
+exec_dry("cd '$appDir'; git fetch -u origin master 2>&1; [ $(git rev-parse HEAD) = $(git rev-parse @{u}) ] && echo 'Up to date' || echo 'Needs update'", $output, $result_code, $dry);
 $status = implode('', $output);
 
 $now = date('Y-m-d-h-i-s');
@@ -167,7 +172,8 @@ if ($init != '') {
         $cronCommend = "# Laravel scheduling for $appName ($appDir)";
 
         exec_dry("crontab -l > $destinationFolder/$now-crontab.txt", $output, $result_code, $dry);
-        file_put_contents($cronFile, "$cronCommend\n* * * * * cd '$appDir' && php artisan schedule:run >> /dev/null 2>&1\n");
+        $contentExistingCrontab = file_get_contents("$destinationFolder/$now-crontab.txt");
+        file_put_contents($cronFile, $contentExistingCrontab . "\n\n$cronCommend\n* * * * * cd '$appDir' && php artisan schedule:run >> /dev/null 2>&1\n");
         exec_dry("crontab $cronFile", $output, $result_code, $dry);
 
         if ($result_code != 0) {
@@ -179,7 +185,7 @@ if ($init != '') {
     }
 }
 
-if (stripos($status, 'Up to date') !== false && !$backupOnly) {
+if (stripos($status, 'Up to date') !== false && !$backupOnly && !$force) {
     echo "\e[32mAll good!\e[0m App is up to date.\n";
     exit(0);
 }
@@ -197,7 +203,7 @@ if ($backupOnly) {
     exit(0);
 }
 
-$gitCmd = $force ? 'git reset --hard 2>&1; git pull 2>&1' : 'git merge 2>&1';
+$gitCmd = $reset ? 'git reset --hard 2>&1; git pull 2>&1' : 'git merge 2>&1';
 exec_dry("cd '$appDir'; $gitCmd", $output, $result_code, $dry);
 
 if ($result_code != 0) {
