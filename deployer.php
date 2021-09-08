@@ -53,6 +53,7 @@ if (count($options) == 0 || isset($options['h']) || isset($options['help'])) {
     echo "                              for now.\n\n";
     echo "  --npm-run=\e[33m<string>\e[0m          Value to be used in 'npm run xxx' commands. Default is 'prod',\n";    
     echo "                              but you can use something like 'dev' to yield 'npm run dev'.\n\n";
+    echo "  --branch=\e[33m<string>\e[0m           Branch to be deployed (default 'master').\n";        
     echo "  -b, --backup-only           Only backup operations will be performed, but no update/fetch\n";
     echo "                              of new code (or migrations).\n\n";
     echo "  -c, --cautious              Make the script abort if any of the informed\n";
@@ -77,6 +78,7 @@ if (isset($options['v']) || isset($options['version'])) {
 $appDir = isset($options['app-dir']) ? $options['app-dir'] : '';
 $backupDir = isset($options['backup-dir']) ? $options['backup-dir'] : '';
 $logDir = isset($options['log-dir']) ? $options['log-dir'] : '';
+$branch = isset($options['branch']) ? $options['branch'] : 'master';
 $init = isset($options['init']) ? $options['init'] : '';
 $npmRun = isset($options['npm-run']) ? $options['npm-run'] : 'prod';
 $backupOnly = isset($options['backup-only']) || isset($options['b']);
@@ -132,7 +134,7 @@ $updateCmd = isset($options['update-cmd']) ?
     ]);
 
 
-exec_dry("cd '$appDir'; git fetch -u origin master 2>&1; [ $(git rev-parse HEAD) = $(git rev-parse @{u}) ] && echo 'Up to date' || echo 'Needs update'", $output, $result_code, $dry);
+exec_dry("cd '$appDir'; git fetch -u origin $branch 2>&1; [ $(git rev-parse HEAD) = $(git rev-parse @{u}) ] && echo 'Up to date' || echo 'Needs update'", $output, $result_code, $dry);
 $status = implode('', $output);
 
 $now = date('Y-m-d-h-i-s');
